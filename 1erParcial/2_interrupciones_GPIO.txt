@@ -1,0 +1,116 @@
+/*
+P0.9
+	Entrada digital con pullup, interrumpe por flanco descendente.
+	Al poner el pin a GND se produce la interrupción y enciende el led rojo. P0.22
+P0.10
+	Entrada digital con pulldown, interrumpe por flanco ascendente.
+	Al poner el pin a 3.3V se produce la interrupción y enciende el led verde.P3.25
+P0.11
+	Entrada digital con pullup, interrumpe por ambos flancos.
+	Al colocar el pin a GND se genera la interrupción por flanco descendente.
+	Si se saca el pin de GND se producirá una nueva interrupción,
+	ahora por flanco ascendente debido a la pullup. Se enciende el led Azul. P3.26
+ */
+
+
+#include "LPC17xx.h"
+
+#define REDLED 		(1<<22)
+#define GREENLED 	(1<<25)
+#define BLUELED 	(1<<26)
+#define INPUT1		(1<<9)
+#define INPUT2		(1<<10)
+#define INPUT3		(1<<11)
+
+void configGPIO(void);
+void configGpioInt(void);
+
+int main(void) {
+
+	configGPIO();
+	configGpioInt();
+	LPC_GPIO0->FIOSET |= REDLED;
+	LPC_GPIO3->FIOSET |= GREENLED;
+	LPC_GPIO3->FIOSET |= BLUELED;
+
+	while(1) {
+		//do nothing
+	}
+
+    return 0 ;
+}
+
+void EINT3_IRQHandler(void) {
+	//debounce treating
+
+	// Preguntamos si el bit de las flags de GPIOINT de flanco descendente corresponiente al P0.9 está en 1
+	if(LPC_GPIOINT->IO0IntStatF & INPUT1) {
+		LPC_GPIO0->FIOSET |= REDLED;
+		LPC_GPIO3->FIOCLR |= GREENLED;
+		LPC_GPIO3->FIOCLR |= BLUELED;
+		LPC_GPIOINT->IO0IntClr |= INPUT1; // Bajo la bandera
+	} // Preguntamos si el bit de las flags de GPIOINT de flanco ascendente corresponiente al P0.10 está en 1
+	else if(LPC_GPIOINT->IO0IntStatR & INPUT2) { //P0.10 rising
+		LPC_GPIO0->FIOCLR |= REDLED;
+		LPC_GPIO3->FIOSET |= GREENLED;
+		LPC_GPIO3->FIOCLR |= BLUELED;
+		LPC_GPIOINT->IO0IntClr |= INPUT2; // Bajo la bandera
+	} // Preguntamos si el bit de las flags de GPIOINT de flanco ascendente o descendente corresponiente al P0.9 está en 1
+	else if(LPC_GPIOINT->IO0IntStatF & INPUT3 || LPC_GPIOINT->IO0IntStatR & INPUT3) { //P0.11 falling/rising
+		LPC_GPIO0->FIOCLR |= REDLED;
+		LPC_GPIO3->FIOCLR |= GREENLED;
+		LPC_GPIO3->FIOSET |= BLUELED;
+		LPC_GPIOINT->IO0IntClr |= INPUT3; // Bajo la bandera
+	}
+}
+
+void configGPIO(void) {
+	/*PINSEL*/
+	// P0.9, P0.10 y P0.11 como GPIO
+	LPC_PINCON->PINSEL0 &= ~(0x3f<<18);
+
+	// P0.22 como GPIO
+	LPC_PINCON->PINSEL1 &= ~(0x3<<12);
+
+	// P3.25 y P3.26 como GPIO
+	LPC_PINCON->PINSEL7 &= ~(0xf<<18);
+
+
+	/*PINMODE*/
+	// P0.9 y P0.11 con pull-up
+	LPC_PINCON->PINMODE0 &= (~(0x3<<18) && ~(0x3<<22));
+
+	// P0.10 con pull-down
+	LPC_PINCON->PINMODE0 |= (0x3<<20);
+
+
+	/*FIODIR*/
+	// P0.9, P0.10 y P0.11 como entradas
+	LPC_GPIO0->FIODIR &= ~INPUT1;
+	LPC_GPIO0->FIODIR &= ~INPUT2;
+	LPC_GPIO0->FIODIR &= ~INPUT3;
+
+	// P0.22, P3.25 y P3.26 como salidas
+	LPC_GPIO0->FIODIR |= REDLED;
+	LPC_GPIO3->FIODIR |= GREENLED;
+	LPC_GPIO3->FIODIR |= BLUELED;
+
+
+	/*FIOMASK*/
+	// P0.22, P3.25 y P3.26 enmascarables
+	LPC_GPIO0->FIOMASK &= ~REDLED;
+	LPC_GPIO3->FIOMASK &= ~GREENLED;
+	LPC_GPIO3->FIOMASK &= ~BLUELED;
+}
+
+void configGpioInt(void) {
+	// Habilito interrupción por flanco ascendente P0.10 y P0.11
+	LPC_GPIOINT->IO0IntEnR |= INPUT2;
+	LPC_GPIOINT->IO0IntEnR |= INPUT3;
+
+	// Habilito interrupción por flanco descendente P0.9 y P0.11
+	LPC_GPIOINT->IO0IntEnF |= INPUT1;
+	LPC_GPIOINT->IO0IntEnF |= INPUT3;
+
+	NVIC_EnableIRQ(EINT3_IRQn); //ISER0 |= (1<<21) (table 52)
+}

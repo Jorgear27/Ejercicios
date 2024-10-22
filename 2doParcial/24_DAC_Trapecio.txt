@@ -1,0 +1,109 @@
+/*
+Ver imagen asociada
+ */
+
+
+#include "lpc17xx_timer.h"    /* Timer0 */
+#include "lpc17xx_pinsel.h"    /* Pin Configuration */
+#include "lpc17xx_dac.h"    /* DAC */
+
+volatile uint8_t estado = 0;
+volatile uint8_t actual_value = 0;
+volatile uint8_t max_value = 0;
+volatile uint8_t max_time = 0;
+volatile uint8_t increment_time = 0;
+volatile uint8_t decrement_time = 0;
+
+void configTimer0(){
+	//Alimentamos TIMER0
+	LPC_SC->PCONP |= 1<<1;
+	
+	//Seleccionamos CCLK 
+	LPC_SC->PCLKSEL |= 1<<2;
+	
+	// Seteamos Prescaler para que TC cuente cada 1ms
+	TIM_TIMERCFG_Type timcfg;
+	timcfg.PrescaleOption = TIM_PRESCALE_USVAL;
+	timcfg.PrescaleValue = 1000;
+	TIM_Init(LPC_TIM0, TIM_TIMER_MODE, &timcfg);
+	
+	// Inicialmente configuramos para que haga match en el canal 0 cada increment_time extraido de la posicion de memoria
+	TIM_MATCHCFG_Type matchcfg;
+	matchcfg.MatchChannel = 0;
+	matchcfg.MatchValue = increment_time;
+	matchcfg.IntOnMatch = ENABLE;
+	matchcfg.StopOnMatch = DISABLE;
+	matchcfg.ResetOnMatch = ENABLE;
+	matchcfg.ExtMatchOutputType = TIM_EXTMATCH_NOTHING;
+	TIM_ConfigMatch(LPC_TIM0,&matchcfg);
+	
+	// Iniciamos Timer0
+	TIM_Cmd(LPC_TIM0, ENABLE);
+	
+	// Habilitamos interrupciones del timer0 en nvic
+	NVIC_Enable(TIMER0_IRQn);
+}
+
+void configDAC(){
+	// Alimentamos DAC habilitando la salida analógica
+	PINSEL_CFG_Type pincfg;
+	pincfg.Portnum = 0;
+	pincfg.Pinnum = 26;
+	pincfg.Funcnum = 1;
+	pincfg.Pinmode = PINSEL_PINMODE_TRISTATE;
+	pincfg.OpenDrain = PINSEL_PINMODE_NORMAL;
+	PINSEL_ConfigPin(&pincfg);
+	
+	//Seleccionamos CCLK para el DAC 
+	LPC_SC->PCLKSEL |= 1<<22;
+	
+	//Seleccionamos BIAS 1 para el DAC
+	DAC_SetBias(LPC_DAC, 1);
+}
+
+void TIMER0_IRQHandler(){
+	switch (estado){
+	case 0: //Estamos todavia incrementando los valores del trapecio
+		actual_value++; //aumento un bit
+		DAC_UpdateValue(LPC_DAC, (uint32_t)actual_value); //Actualizamos valor del DAC
+		if (actual_value==max_value){//Si ya llego al máximo
+			estado=1; //cambio de estado
+			TIM_UpdateMacthValue(LPC_TIM0,0,(uint32_t)max_time);//actualizo nuevo tiempo para interrumpir
+		}
+		TIM_ClearIntPending(LPC_TIM0, TIM_MR0_INT);
+		break;
+	case 1: //ya termino el tiempo de estado en el maximo valor
+		estado=2; //cambio de estado
+		TIM_UpdateMacthValue(LPC_TIM0,0,(uint32_t)decrement_time); //actualizo nuevo tiempo para interrumpir en decremento
+		TIM_ClearIntPending(LPC_TIM0, TIM_MR0_INT);
+		break;
+	case 2:
+		actual_value--;//disminuyo un bit
+		DAC_UpdateValue(LPC_DAC, (uint32_t)actual_value);//Actualizamos valor del DAC
+		if (actual_value==0){
+			TIM_Cmd(LPC_TIM0,DISABLE); //Deshabilito Timer0
+			NVIC_DisableIRQ(TIMER0_IRQn); //Deshabilito interupciones del Timer0
+		}
+		break;
+	}
+
+}
+
+int main(){
+	// Creamos el puntero a la direccion de memoria donde están los datos
+	uint32_t *ptr = (uint32_t *)0x10004000;
+	
+	// Extraemos cada uno de los datos correspondientes
+	max_value = *ptr & (0xFF);
+	max_time = *ptr & (0xFF<<8);
+	increment_time = *ptr & (0xFF<<16);
+	decrement_time = *ptr & (0xFF<<24);
+	
+	// Llamamos a las funciones de configuración
+	configTimer();
+	configDAC();
+	
+	while(){
+		//do nothing
+	}
+}

@@ -1,0 +1,5 @@
+/*
+ * Implementar un osciloscopio básico para audio frecuencia que soporte entradas de -1.5 a +1.5V con el 
+LPC1769 utilizando DMA para transferir datos del ADC a memoria (P2M). Calcular el peiodo y valor
+maximo de la señal. Suponer que la señal tiene offset para tener rango de 0 a 3 V
+*/

@@ -1,0 +1,12 @@
+/*
+	Un estacionamiento automatizado utiliza una barrera que se abre y cierra en 
+funcion de la validacion de un ticket. Frecuencia d cclk=70Mhz. Cuando el sistema
+detecta que se frena un auto frente a la barrera se activa un sensor conectado al pin P2.4 
+mediante una interrupcion externa. Una vez validado el ticket el sistema activa un motor
+que abre la barrera usando el P0.15. Este debe prenderse por x segundos y luego apagarse
+usando el Systick. Si el ticket es inválido se prende un LED en P1.5. Para determinar
+los x segundos existe un switch conectado al P3.4 que dispone de una ventana de 3 
+segundos gestionada por P3.4
+ */
+
+#include "LPC17xx.h"

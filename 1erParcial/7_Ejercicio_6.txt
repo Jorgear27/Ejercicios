@@ -1,0 +1,107 @@
+/*
+	Realizar un programa que configure el puerto P2.0 y P2.1 para que provoquen
+	una interrupción por flanco de subida para el primer pin y por flanco de bajada
+	para el segundo. Cuando la interrupción sea por P2.0 se enviará por el pin P0.0 la
+	secuencia de bits 010011010. Si la interrupción es por P2.1 se enviará por el pin
+	P0.1 la secuencia 011100110. Las secuencias se envían únicamente cuando se
+	produce una interrupción, en caso contrario la salida de los pines tienen valores 1
+	lógicos. ¿que prioridad tienen configuradas por defecto estas interrupciones?
+ */
+
+#include "LPC17xx.h"
+
+#define E1 (1)
+#define E2 (1<<1)
+#define S1 (1)
+#define S2 (1<<1)
+
+void configGPIO(void);
+void configINT(void);
+void delay(uint32_t times);
+
+int main(void){
+	configGPIO();
+	configINT();
+
+	while(1){
+		LPC_GPIO0->FIOSET |= S1; //1
+		LPC_GPIO0->FIOSET |= S2; //1
+	}
+
+
+}
+
+void configGPIO(void){
+	LPC_PINCON -> PINSEL4 &= ~(0xf);//P2.0 y P2.1 como GPIO
+	LPC_PINCON -> PINSEL0 &= ~(0xf);//P0.0 y P0.1 como GPIO
+
+	LPC_PINCON->PINMODE4 |= 0x3; //P2.0 con pull-down
+	LPC_PINCON->PINMODE4 &= ~(0x3<<2); //P2.1 con pull-up
+
+	LPC_GPIO2->FIODIR &= ~E1; //P2.0 como entrada
+	LPC_GPIO2->FIODIR &= ~E2; //P2.1 como entrada
+	LPC_GPIO0->FIODIR |= S1; //P0.0 como salida
+	LPC_GPIO0->FIODIR |= S2; //P0.1 como salida
+
+	LPC_GPIO0->FIOMASK &= ~S1; //P0.0 enmascarable
+	LPC_GPIO0->FIOMASK &= ~S2; //P0.1 enmascarable
+}
+
+void configINT(void){
+	LPC_GPIOINT->IO2IntEnR |= E1;//P2.0 interrumpe por flanco de subida
+	LPC_GPIOINT->IO2IntEnF |= E2;//P2.1 interrumpe por flanco de bajada
+
+	NVIC->ISER |= (1<<21); // habilitamos interrupciñon en el NVIC por defecto con prioridad 21
+	//NVIC_EnableIRQ(EINT3_IRQn);
+}
+
+void EINT3_IRQHandler(){
+	if (LPC_GPIOINT->IO2IntStatR & E1){ // Si hubo interrupcion por subida de P2.0
+		LPC_GPIO0->FIOCLR |= S1; //0
+		delay(100);
+		LPC_GPIO0->FIOSET |= S1; //1
+		delay(100);
+		LPC_GPIO0->FIOCLR |= S1; //0
+		delay(100);
+		LPC_GPIO0->FIOCLR |= S1; //0
+		delay(100);
+		LPC_GPIO0->FIOSET |= S1; //1
+		delay(100);
+		LPC_GPIO0->FIOSET |= S1; //1
+		delay(100);
+		LPC_GPIO0->FIOCLR |= S1; //0
+		delay(100);
+		LPC_GPIO0->FIOSET |= S1; //1
+		delay(100);
+		LPC_GPIO0->FIOCLR |= S1; //0
+		delay(100);
+	} else{
+		LPC_GPIO0->FIOCLR |= S1; //0
+		delay(100);
+		LPC_GPIO0->FIOSET |= S1; //1
+		delay(100);
+		LPC_GPIO0->FIOSET |= S1; //1
+		delay(100);
+		LPC_GPIO0->FIOSET |= S1; //1
+		delay(100);
+		LPC_GPIO0->FIOCLR |= S1; //0
+		delay(100);
+		LPC_GPIO0->FIOCLR |= S1; //0
+		delay(100);
+		LPC_GPIO0->FIOSET |= S1; //1
+		delay(100);
+		LPC_GPIO0->FIOSET |= S1; //1
+		delay(100);
+		LPC_GPIO0->FIOCLR |= S1; //0
+		delay(100);
+	}
+
+	LPC_GPIOINT->IO2IntClr |= (0x3); // bajamos banderas de P2.0 y P2.1
+
+}
+
+void delay(uint32_t times){
+	for (uint32_t i=0; i<times; i++){
+		for (uint32_t j=0; j<times; j++){
+	}
+}

@@ -1,0 +1,47 @@
+/*
+	Considerando pulsadores normalmente abiertos conectados en un extremo a
+	masa y en el otro directamente a las entradas P0.0 y p0.1. Realizar un programa
+	que identifique en una variable cual o cuales pulsadores han sido presionados.
+	Las identificaciones posibles a implementar en esta variable van a ser "ninguno",
+	"pulsador 1", "pulsador 2", "pulsador 1 y 2".
+ */
+
+#include "LPC17xx.h"
+
+#define E1 (1)
+#define E2 (1<<1)
+
+volatile uint8_t identificador = 0; //0 = ninguno
+									//1 = pulsador 1
+									//2 = pulsador 2
+									//3 = ambos pulsadores
+
+void configGPIO(void);
+void configINT(void);
+
+int main(void){
+	configGPIO();
+
+	while(1){
+		if (LPC_GPIO->FIOPIN & E1){
+			identificador=1;
+			if(LPC_GPIO->FIOPIN & E2){
+				identificador = 3;
+			}
+		} else if (LPC_GPIO->FIOPIN & E2){
+			identificador = 2;
+		} else {
+			identificador = 0;
+		}
+	}
+}
+
+void configGPIO(voifçd){
+	LPC_PINCON->PINSEL0 &= ~(0xf);//P0.0 y P0.1 como GPIO
+
+	LPC_PINCON->PINMODE0 &= ~(0xf);//P0.0 y P0.1 con pull-up
+
+	LPC_GPIO0->FIODIR &= ~E1;//P0.0 como entrada
+	LPC_GPIO0->FIODIR &= ~E2;//P0.1 como entrada
+
+}

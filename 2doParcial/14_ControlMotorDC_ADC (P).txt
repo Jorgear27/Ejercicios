@@ -1,0 +1,25 @@
+/*
+# Problema: Sistema de Control de Velocidad para Motor DC
+
+### Objetivo:
+Diseñar un sistema de control de velocidad para un motor DC utilizando la LPC1769. 
+El sistema utilizará un potenciómetro para ajustar la velocidad deseada, y empleará PWM para controlar la velocidad real del motor. 
+Además, implementará un sistema de monitoreo y seguridad. Si detecta una sobrecarga, reducirá la velocidad del motor.
+
+### Requisitos:
+- Utilizar el ADC para leer la posición del potenciómetro, que representará la velocidad deseada.
+- Implementar un timer para generar una señal PWM que controle la velocidad del motor.
+- Utilizar otro timer para muestrear periódicamente la velocidad actual del motor (simulada).
+- Emplear interrupciones para manejar las lecturas del ADC y las acciones de los timers.
+
+### Estados de Operación:
+1. *Reposo*: Motor apagado (0% duty cycle)
+2. *Normal*: Motor funcionando a la velocidad deseada
+3. *Sobrecarga*: Motor funcionando a velocidad reducida
+
+### Sistema de Seguridad:
+- Implementar un sistema de seguridad que detecte sobrecargas (simuladas) y ajuste el estado del sistema.
+
+### Indicadores:
+- Utilizar LEDs para indicar el estado actual del sistema.
+*/

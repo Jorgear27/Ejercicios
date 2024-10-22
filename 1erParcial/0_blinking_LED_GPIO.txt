@@ -1,0 +1,79 @@
+/*
+===============================================================================
+Queremos hacer parapadear 3 LEDs
+RED_LED: P0.22
+GREEN_LED: P3.25
+BLUE_LED: P3.26
+
+PASOS:
+1. PINSEL - Configurar función del PIN (GPIO, RX, TX, etc)
+2. PINMODE - Configurar modo del PIN (Pull-down, Pull-up, etc)
+3. FIODIR - Cofigurar dirección del PIN (Entrada o salida)
+4. FIOSET y FIOCLR - Vamos variando el valor de salida del pin en el main
+===============================================================================
+*/
+
+
+#include "LPC17xx.h"
+
+// Asignamos a cada LED su pin físico para más simplicidad,
+// desplazamos un 1 "x" lugares, correspondientes a su conexión
+#define REDLED 		(1<<22)
+#define GREENLED 	(1<<25)
+#define BLUELED 	(1<<26)
+
+void configGPIO(void);
+void delay(uint32_t times);
+
+int main(void) {
+
+	configGPIO();
+	// Creamos un puntero hacia el registro FIOxSET acorde al puerto "x" en los que tenemos los LEDs
+	LPC_GPIO0->FIOSET |= REDLED; // FIO0SET || 0000 0000 0100 0000 0000 0000 0000 0000
+	LPC_GPIO3->FIOSET |= GREENLED; // FIO3SET || 0000 0010 0000 0000 0000 0000 0000 0000
+	LPC_GPIO3->FIOSET |= BLUELED; // FIO3SET || 0000 0100 0100 0000 0000 0000 0000 0000
+	// Al colocar un 1 en el registro FIOxSET, el pin correspondiente a ese número de bit donde esta el 1
+	// cambia a HIGH. En los bits en los que ponemos 0, no se ejecuta el SET por lo que no se ven modificados
+
+	while(1) {
+		LPC_GPIO3->FIOSET |= BLUELED;
+		LPC_GPIO0->FIOCLR |= REDLED;
+		delay(1000);
+		LPC_GPIO0->FIOSET |= REDLED;
+		LPC_GPIO3->FIOCLR |= GREENLED;
+		delay(1000);
+		LPC_GPIO3->FIOSET |= GREENLED;
+		LPC_GPIO3->FIOCLR |= BLUELED;
+		delay(1000);
+	}
+
+    return 0 ;
+}
+
+void configGPIO(void) {
+	/*PINSEL*/
+	// Creamos un puntero hacia el registro PINSEL acorde al pin que queremos configurar
+	LPC_PINCON->PINSEL1 &= ~(0x3<<12); // PINSEL1 && 1111 1111 1111 1111 1100 1111 1111 1111
+	// Hacemos un AND del contenido de ese registro con un 3 binario negado desplazado 12 lugares
+	// Entonces nos aseguramos que el bit 12 y 13 son 0, que corresponde a configurar el P0.22 como GPIO
+
+	// Hacemos lo mismo con los bits del PINSEL correspondientes al P3.25 y P3.26
+	LPC_PINCON->PINSEL7 &= ~(0xf<<18); // PINSEL7 && 1111 1100 0011 1111 1111 1111 1111 1111
+
+
+
+	/*FIODIR*/
+	// Creamos un puntero hacia el registro FIODIR acorde al pin que queremos configurar
+	// La "x" en LPC_GPIOx indica a que puerto hace referencia y le suma, gracias a la librería,
+	// x * 32 bits a la dirección de memoria, obteniendo asi el FIOxDIR correspondiente
+	LPC_GPIO0->FIODIR |= REDLED; // FIO0DIR || 0000 0000 0100 0000 0000 0000 0000 0000
+	LPC_GPIO3->FIODIR |= GREENLED; // FIO3DIR || 0000 0010 0100 0000 0000 0000 0000 0000
+	LPC_GPIO3->FIODIR |= BLUELED; // FIO3DIR || 0000 0100 0000 0000 0000 0000 0000 0000
+	// Hacemos un OR del contenido de ese registro con un 1 en la posición de cada LED
+	// Entonces nos aseguramos que el bit correspondiente a cada pin de cada puerto esté como salida
+}
+
+void delay(uint32_t times) {
+	for(uint32_t i=0; i<times; i++)
+		for(uint32_t j=0; j<times; j++);
+}

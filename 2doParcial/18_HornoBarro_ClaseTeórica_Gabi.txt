@@ -1,0 +1,138 @@
+/*
+El horno fabrica implementa una PLC1769 para el secado de la produccion.
+Un operario enciende y verifica por medio de 3 leds la temperatura. Si es igual a 70, 50 o 30
+ */
+
+
+#include "lpc17xx_timer.h"    /* Timer0 */
+#include "lpc17xx_gpio.h"    /* GPIO */
+#include "lpc17xx_pinsel.h"    /* Pin Configuration */
+#include "lpc17xx_adc.h"    /* ADC */
+
+#define ADC_rate 100000
+
+volatile uint8_t estado = 0;
+
+
+void configTIMER0(){
+	// Alimentamos Timer0
+	LPC_SC->PCONP |= 1<<1;
+
+	// Seleccionamos CCLK para clock del timer0
+	LPC_SC->PCLKSEL0 |= 1<<2;
+
+	// Prescale para que TC aumente cada 1us
+	TIM_TIMERCFG_Type timcfg;
+	timcfg.PrescaleOption = TIM_PRESCALE_USVAL;
+	timcfg.PrescaleValue = 1;
+
+	// MATCH cada 1000000 us o 1s
+	TIM_MATCHCFG_Type matchcfg;
+	matchcfg.MatchChannel = 0;
+	matchcfg.IntOnMatch = ENABLE;
+	matchcfg.ResetOnMatch = ENABLE;
+	matchcfg.StopOnMatch = DISABLE;
+	matchcfg.ExtMatchOutputType = TIM_EXTMATCH_NOTHING;
+	matchcfg.MatchValue = 1000000;
+
+	TIM_Init(LPC_TIM0, TIM_TIMER_MODE, &timcfg);
+	TIM_ConfigMatch(LPC_TIM0, &matchcfg);
+
+	// Empezamos Timer
+	TIM_Cmd(LPC_TIM0,ENABLE);
+
+	// Habilitamos interrupciones del timer
+	NVIC_EnableIRQ(TIMER0_IRQn);
+}
+
+void configADC(){
+	// Configuramos P0.23 como ADC00
+	PINSEL_CFG_Type pincfg;
+	pincfg.Portnum = 0;
+	pincfg.Pinnum = 23;
+	pincfg.Funcnum = 1;
+	pincfg.Pinmode = PINSEL_PINMODE_TRISTATE;
+	pincfg.OpenDrain = PINSEL_PINMODE_NORMAL;
+	PINSEL_ConfigPin(&pincfg);
+
+	// ADC con frecuencia de sampleo de 100KHz
+	ADC_Init(LPC_ADC,ADC_rate);
+
+	// Habilitamos el canal 0 del ADC
+	ADC_ChannelCmd(LPC_ADC,0,ENABLE);
+
+	// Habilitamos interrupciones del canal 0 del ADC
+	ADC_IntConfig(LPC_ADC,0,SET);
+
+	// Habilitamos interrupciones del ADC
+	NVIC_EnableIRQ(ADC_IRQn);
+}
+
+void configLED(){
+	// Configuramos P0.0 como GPIO
+	PINSEL_CFG_Type pincfg;
+	pincfg.Portnum = 0;
+	pincfg.Pinnum = 0;
+	pincfg.Funcnum = 0;
+	pincfg.Pinmode = PINSEL_PINMODE_PULLUP;
+	pincfg.OpenDrain = PINSEL_PINMODE_NORMAL;
+	PINSEL_ConfigPin(&pincfg);
+
+	// Configuramos P0.1 como GPIO
+	pincfg.Pinnum = 1;
+	PINSEL_ConfigPin(&pincfg);
+
+	// Configuramos P0.2 como GPIO
+	pincfg.Pinnum = 2;
+	PINSEL_ConfigPin(&pincfg);
+
+	// Configuramos P0.0-P0.2 como salida
+	GPIO_SetDir(0,0x7,1);
+}
+
+void TIMER0_IRQHandler(){
+	// Comienzo conversión ADC
+	ADC_StartCmd(LPC_ADC,ADC_START_NOW);
+
+	//Bajo Bandera de interrupcion
+	TIM_ClearIntPending(LPC_TIM0, TIM_MR0_INT);
+}
+
+void ADC_IRQHandler(){
+	// Leo el valor de conversion
+	uint16_t adc_value = 0;
+	adc_value = ADC_ChannelGetData(LPC_ADC,0);
+
+	// Suponiendo que el 3.3 V es 100º y 0v son 0º realizamos la conversion
+	adc_value = adc_value/4096 * 100;
+
+	if(adc_value <= 30){
+		estado = 0;
+	} else if ((adc_value <= 50)){
+		estado = 1;
+	} else{
+		estado = 2;
+	}
+}
+
+int main(){
+	configTIMER0();
+	configADC();
+	configLED();
+
+	while(1){
+		switch(estado){
+		case 0:
+			GPIO_SetValue(0,0x1);
+			GPIO_ClearValue(0,0x3<<1);
+			break;
+		case 1:
+			GPIO_SetValue(0,0x3);
+			GPIO_ClearValue(0,0x1<<2);
+			break;
+		case 2:
+			GPIO_SetValue(0,0x7);
+			break;
+		}
+	}
+}

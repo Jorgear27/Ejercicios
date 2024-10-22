@@ -1,0 +1,80 @@
+/* Generamos una interrupción cada segundo con Timer 0
+ * al ocurrir la interrupcion, alternar el estado de un LED en el PO.22
+ * CCLK = 100MHZ
+ */
+
+#include "lpc17xx.h"
+#include "lpc17xx_gpio.h"
+#include "lpc17xx_pinsel.h"
+#include "lpc17xx_timer.h"
+
+#define LED (1<<22)
+#define MATCH0 (1<<28)
+#define ticksMatch 1000000 //Match cada 1s o 1000000 microseg
+
+void configTimer(){
+	//Alimentamos Timer
+	LPC_SC->PCONP |= 1<<1;
+	
+	//Configuramos CCLK del Timer con el mismo del CPU
+	LPC_SC->PCLKSEL0 |= 1<<2;
+	
+	//Configuramos Timer
+	TIM_TIMERCFG_Type timcfg;
+	timcfg.PrescaleOption = TIM_PRESCALE_USVAL;
+	timcfg.PrescaleValue = 1; //Configuramos para que TC aumente cada 1 microsegundo
+	TIM_Init(LPC_TIM0, TIM_TIMER_MODE, &timcfg);
+	
+	//Configuramos MATCH
+	TIM_MATCHCFG_Type matcfg;
+	matcfg.MatchChannel = 0;
+	matcfg.IntOnMatch = ENABLE;
+	matcfg.StopOnMatch = DISABLE;
+	matcfg.ResetOnMatch = ENABLE;
+	matcfg.ExtMatchOutputType = TIM_EXTMATCH_NOTHING;
+	matcfg.MatchValue = ticksMatch;
+	TIM_ConfigMatch(LPC_TIM0, &matcfg);
+	
+	//Habilitamos Timer0
+	TIM_Cmd(LPC_TIM0, ENABLE);	
+	
+	//Habilitamos interrupciones del Timer0
+	NVIC_EnableIRQ(TIMER0_IRQn);
+}
+
+void configLED(){
+	//configuramos pin GPIO del led
+	PINSEL_CFG_Type pincfg;
+	pincfg.Portnum = 0;
+	pincfg.Pinnum = LED;
+	pincfg.Fucnnum = 0;
+	pincfg.Pinmode = PINSEL_PINMODE_PULLUP;
+	pincfg.OpenDrain = PINSEL_PINMODE_NORMAL;
+	PINSEL_ConfigPin(&pincfg);
+	
+	//configuramos GPIO como salida
+	GPIO_SetDir(0,LED, 1);
+}
+
+void TIMER0_IRQHandler(){
+	//Preguntamos si la interrupcion es del MATCH0
+	if (TIM_GetIntStatus(LPC_TIM0,TIM_MR0_INT)){
+		//Bajamos bandera
+		TIM_ClearIntPending(LPC_TIM0,TIM_MR0_INT);
+		//Hacemos Toggle del LED
+		if (GPIO_ReadValue(0)&LED){ //Estaba encendido
+			GPIO_ClearValue(0, LED);
+		}else{
+			GPIO_SetValue(0, LED);
+		}
+	}
+	
+}
+
+int main(){
+	configTimer();
+	configLED();
+	while(1){
+		// do nothing
+	}
+}

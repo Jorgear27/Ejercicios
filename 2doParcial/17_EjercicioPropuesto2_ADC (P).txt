@@ -1,0 +1,9 @@
+/*
+2- Dada dos señal de 50khz periódicas de componente espectral máxima que
+ingresan por pines del ADC, se necesita convolucionarlas en el dominio del
+tiempo (las señales son de secuencias sincronizadas) y almacenarlas. El rango
+dinámico de amplitud es de 3.3v.
+Escriba el programa de la manera más conveniente. Definir si burst o software,
+tiempos de sampleo, tipo de variables.
+Encontrar el patrón de cada secuencia y hacer la convolución para un período.
+/*

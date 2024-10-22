@@ -1,0 +1,6 @@
+/*
+# Implementación de un Sistema de Monitoreo de Temperatura con LEDs
+
+ 
+Implementar un sistema que lea el valor de un sensor de temperatura analógico conectado al canal 0 del ADC, configurado para generar una conversión periódica mediante un temporizador. El sistema debe levantar una interrupción cuando la conversión ADC esté lista, y en base al valor de temperatura, tomar decisiones. Si la temperatura supera un umbral predefinido, se debe encender un LED rojo (simulando una alarma), sino un LED verde. Tener en cuenta los valores de referencia del ADC.
+/*

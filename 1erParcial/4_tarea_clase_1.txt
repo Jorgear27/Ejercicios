@@ -1,0 +1,104 @@
+/*
+ * S1: P0.19
+ * S2: P1.15
+ * E1: P0.23
+ *
+ * Obternemos la forma de onda a la salida correspondiente dependiendo la entrada
+ */
+
+#include "LPC17xx.h"
+
+#define S1 (1<<19)
+#define S2 (1<<15)
+#define E1 (1<<23)
+
+volatile uint32_t cont5ms = 0;
+volatile uint32_t cont25ms = 0;
+volatile uint32_t previous = 0;
+volatile uint32_t current = 0;
+
+void configGPIO(void);
+void configSystick(void);
+void configINT(void);
+
+int main(void){
+
+	configGPIO();
+	configSystick();
+	configINT();
+
+	LPC_GPIO0->FIOCLR |= S1;
+	LPC_GPIO1->FIOSET |= S2;
+
+	while(true){
+
+	}
+}
+
+void SysTick_Handler(void){
+	cont5ms++;
+
+	if (cont5ms == 5){
+		cont25ms++;
+		cont5ms=0;
+
+		if(LPC_GPIO0->FIOPIN &= E1){// Si la entrada está en alto
+
+		}
+		else {
+			if (cont25ms % 2 != 0){// Si el ciclo de 25ms es impar
+
+			}
+
+			if (cont25ms==7){// si ya se cumplieron 7 veces 25 ms
+				cont25ms=0;
+
+			}
+		}
+
+
+	}
+
+
+}
+
+void EINT3_IRQHandler(void) {
+	cont5ms=0;
+	cont25ms=0;
+
+	if(LPC_GPIOINT->IO0IntStatR &= E1){ //Si la interrpución fue por flanco ascendente
+
+	}
+}
+
+void configGPIO(void){
+	LPC_PINCON->PINSEL1 &= ~(3<<6); //P0.19 como GPIO
+	LPC_PINCON->PINSEL2 &= ~(3<<30); //P1.15 como GPIO
+	LPC_PINCON->PINSEL1 &= ~(3<<14);//P0.23 como GPIO
+
+	LPC_PINCON->PINMODE1 |= (3<<14);//P0.23 con pull-down
+
+
+	LPC_GPIO0->FIODIR |= S1; //P0.19 como ENTRADA
+	LPC_GPIO1->FIODIR |= S2; //P1.15 como ENTRADA
+	LPC_GPIO0->FIODIR &= ~E1; //P0.23 como SALIDA
+
+	LPC_GPIO0->FIOMASK &= ~S1; //P0.23 como GPIO
+	LPC_GPIO1->FIOMASK &= ~S2; //P1.15 como GPIO
+}
+
+void configINT(void){
+	LPC_GPIOINT->IO0IntEnF |= E1; //P0.23 interrumpe por flanco descendente
+	LPC_GPIOINT->IO0IntEnR |= E1; //P0.23 interrumpe por flanco ascendente
+	NVIC_EnableIRQ(EINT3_IRQn); //habilito INT del GPIO o EINT3
+}
+
+void configSYSTICK(void){
+	SysTick_Config(499999);
+	/*
+	 *  SysTick->CTRL |= (0x7); //
+	 *  SysTick->LOAD = 0x7A11F;
+	 *  SysTick-VAL = 0;
+	 *  NCIC_SetPriority(SysTick_IRQn, 5);
+	 */
+}

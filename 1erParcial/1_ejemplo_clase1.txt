@@ -1,0 +1,117 @@
+/*
+===============================================================================
+ Name        : Ejercicio propuesto clase 1
+ Author      : $(author)
+ Version     :
+ Copyright   : $(copyright)
+ Description : main definition
+===============================================================================
+
+Configurar:	P0.23 entrada
+			P0.19 y P1.15 salida
+
+Funcionamiento: Dependiendo la entrada, la forma de onda generada por cada salida
+
+*/
+
+#include "LPC17xx.h"
+
+#define S1_OUT	(1<<19)
+#define S2_OUT 	(1<<15)
+#define ENTRADA (1<<23)
+
+void configGPIO(void);
+void func_read_pin(void);
+void func_delay(uint32_t times);
+void func_s1_out(void);
+void func_s2_out(void);
+
+
+int main(void) {
+
+	configGPIO();
+
+	while(1) {
+		func_read_pin();
+
+		func_delay();
+
+		func_s1_out();
+		func_s2_out();
+	}
+	// Creamos un puntero hacia el registro FIOxSET acorde al puerto "x" en los que tenemos los LEDs
+	LPC_GPIO0->FIOSET |= REDLED; // FIO0SET || 0000 0000 0100 0000 0000 0000 0000 0000
+	LPC_GPIO3->FIOSET |= GREENLED; // FIO3SET || 0000 0010 0000 0000 0000 0000 0000 0000
+	LPC_GPIO3->FIOSET |= BLUELED; // FIO3SET || 0000 0100 0100 0000 0000 0000 0000 0000
+	// Al colocar un 1 en el registro FIOxSET, el pin correspondiente a ese número de bit donde esta el 1
+	// cambia a HIGH. En los bits en los que ponemos 0, no se ejecuta el SET por lo que no se ven modificados
+
+    return 0 ;
+}
+
+void configGPIO(void) {
+	/*PINSEL*/
+
+	// Configuramos P0.19 y P0.23 como GPIO
+	LPC_PINCON->PINSEL1 &= (~(0x3<<6) && ~(0x3<<14));
+	// PINSEL1 && (1111 1111 1111 1111 1111 1111 0011 1111 &&
+	// 			   1111 1111 1111 1111 0011 1111 1111 1111)
+	// PINSEL1 &&  1111 1111 1111 1111 0011 1111 0011 1111
+
+	// Configuramos P1.15 como GPIO
+	LPC_PINCON->PINSEL2 &= ~(0x3<<30);
+	// PINSEL2 &&  0011 1111 1111 1111 1111 1111 1111 1111
+
+
+	/*PINMODE*/
+
+	// Configuramos P0.23 con pull-down
+	LPC_PINCON->PINMODE1 |= (0x3<<14);
+	// PINMODE1 ||  0000 0000 0000 0000 1100 0000 0000 0000
+
+
+	/*FIODIR*/
+
+	// Configuramos P0.23 como entrada y P0.19 y P1.15 como salida
+	LPC_GPIO0->FIODIR &= ~ENTRADA; // FIO0DIR && 1111 1111 0111 1111 1111 1111 1111 1111
+	LPC_GPIO0->FIODIR |= S1_OUT; // FIO0DIR || 0000 0000 0000 1000 0000 0000 0000 0000
+	LPC_GPIO1->FIODIR |= S2_OUT; // FIO1DIR || 0000 0000 0000 0000 1000 0000 0000 0000
+
+
+	/*FIOMASK*/
+
+	// Configuramos P0.19 y P1.15 para que se puedan modificar con FIOSET, FIOCLR, FIOPIN
+	LPC_GPIO0->FIOMASK &= ~S1_OUT; // FIO0DIR && 1111 1111 1111 0111 1111 1111 1111 1111
+	LPC_GPIO1->FIOMASK &= ~S2_OUT; // FIO1DIR || 1111 1111 1111 1111 0111 1111 1111 1111
+}
+
+
+void func_read_pin(void) {
+	for(uint32_t i=0; i<times; i++)
+		for(uint32_t j=0; j<times; j++);
+}
+
+
+void func_s1_out(void) {
+	LPC_GPIO3->FIOSET |= BLUELED;
+	LPC_GPIO0->FIOCLR |= REDLED;
+	delay(1000);
+	LPC_GPIO0->FIOSET |= REDLED;
+	LPC_GPIO3->FIOCLR |= GREENLED;
+	delay(1000);
+	LPC_GPIO3->FIOSET |= GREENLED;
+	LPC_GPIO3->FIOCLR |= BLUELED;
+	delay(1000);
+}
+
+
+void func_s2_out(void) {
+	for(uint32_t i=0; i<times; i++)
+		for(uint32_t j=0; j<times; j++);
+}
+
+
+void func_delay(uint32_t times) {
+	for(uint32_t i=0; i<times; i++)
+		for(uint32_t j=0; j<times; j++);
+}

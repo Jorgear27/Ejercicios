@@ -1,0 +1,92 @@
+/*
+	Configure el Systick Timer de modo que genere una forma de onda llamada PWM
+	tal como la que se muestra en la figura adjunta. Esta señal debe ser sacada por el
+	pin P0.22 para que controle la intensidad de brillo del led. El periodo de la señal
+	debe ser de 10 mseg con un duty cycle de 10%. Configure la interrupción externa
+	EINT0 de modo que cada vez que se entre en una rutina de interrupción externa el
+	duty cycle incremente en un 10% (1 mseg). Esto se repite hasta llegar al 100%,
+	luego, si se entra nuevamente a la interrupción externa, el duty cycle volverá al 10%.
+	b. Modificar los niveles de prioridad para que la interrupción por systick tenga
+	mayor prioridad que la interrupción externa.
+ */
+
+#include "LPC17xx.h"
+
+volatile uint32_t duty_cycle = 1;
+volatile uint32_t contador = 0;
+
+#define S1 (1<22)
+
+void configGPIO(void);
+void configEINT(void);
+void configSysTick(void);
+
+
+int main(void){
+	configGPIO();
+	configEINT();
+	configSysTick();
+
+	LPC_GPIO0->FIOSET |= S1; // empiezo con la salida en alto
+
+	while(1){
+
+	}
+}
+
+void configGPIO(void){
+	//PINSEL
+	LPC_PINCON->PINSEL1 &= ~(0x3<<12); // P0.22 como GPIO
+
+	//FIODIR
+	LPC_GPIO0->FIODIR |= S1; // P0.22 como salida
+
+	//FIOMASK
+	LPC_GPIO0->FIOMASK &= ~S1; // P0.22 enmascarable
+}
+
+void configEINT(void){
+	LPC_PINCON->PINSEL4 &= ~(0x1<<25);
+	LPC_PINCON->PINSEL4 |= (0x1<<24); // EINT2
+
+	LPC_PINCON->PINMODE4 &= ~(0x3<<24); // EINT2 con pull-up
+
+	LPC_SC->EXTMODE |= (0x1<<2); // EINT2 edge sensitive
+
+	LPC_SC->EXTPOLAR &= ~(0x1<<2); // EINT2 falling edge
+
+	LPC_SC->EXTINT |= (0x1<<2); // EINT2 clear flag
+
+	NVIC_EnableIRQ(EINT2_IRQn); // enable interruption: NVIC->ISER |= (0x1<<20)
+}
+
+void configSysTick(void){
+	SysTick->CTRL |= (0x7);
+	SysTick->LOAD = 0x1869F;
+	SysTick->VAL = 0;
+	// interrupciones cada 1ms
+}
+
+void EINT2_IRQHandler(){
+	duty_cycle++;
+	if(duty_cycle > 10){// Si el duty cycle ya es mas del 100%
+		duty_cycle = 1;
+	}
+
+	LPC_SC->EXTINT |= (1<<2); // clear flag
+}
+
+void SysTick_Handler(){
+	contador++;
+	if (contador==10){ // si ya se completó un periodo
+		contador=0; // Empieza la señal de nuevo
+		LPC_GPIO0->FIOSET |= S1;
+	}
+
+	if (contador==duty_cycle){ //Si ya se cumplió el duty cycle
+		LPC_GPIO0->FIOCLR |= S1; //pongo a 0 la salida
+	}
+
+	SysTick->CTRL &= SysTick->CTRL; //Clear flag
+}
+

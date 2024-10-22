@@ -1,0 +1,165 @@
+/*
+1. Generar con timer0 una señal de freq. variable.
+2. Usando el capture “medir”el periodo usando otro timer.
+3. Prender leds tipo vúmetro según la frecuencia.
+4. Con un pulsador cambiar la frecuencia de pasos de 100khz. Actualizar el
+vúmetro.
+*/
+
+#include "lpc17xx.h"
+#include "lpc17xx_gpio.h"
+#include "lpc17xx_pinsel.h"
+#include "lpc17xx_timer.h"
+#include "lpc17xx_exti.h"
+
+#define LEDS (0x1F) //Leds P0.0 al P0.4
+
+volatile uint8_t estado = 0;
+volatile uint32_t matches[5]={4999,2499,1659,1249,999};
+					/* 100 Hz --> 10ms --> toggle cada 5ms --> tickval = t/TC -1 = 4999
+						200 Hz --> 5ms --> toggle cada 2.5ms --> tickval = t/TC -1 = 2499
+						300 Hz --> 3.3ms --> toggle cada 1.66ms --> tickval = t/TC -1 = 1659
+						400 Hz --> 2.5ms --> toggle cada 1.25ms --> tickval = t/TC -1 = 1249
+						500 Hz --> 2ms --> toggle cada 1ms --> tickval = t/TC -1 = 999
+					 */
+volatile uint32_t periodo = 0;
+volatile uint32_t anterior = 0;
+volatile uint32_t actual = 0;
+
+void configTimer0(){
+	//Configuramos P1.28 como MAT0.0
+	PINSEL_CFG_TYPE pincfg;
+	pincfg.Portnum = 1;
+	pincfg.Pinnum = 28;
+	pincfg.Funcnum = 3;
+	pincfg.Pinmode = PINSEL_MODE_PULLUP;
+	pincfg.OpenDrain = PINSEL_PINMODE_NORMAL;
+	PINSEL_ConfigPin(&pincfg);
+
+	//Alimentamos timer 0
+	LPC_SC->PCONP |= 1<<1;
+
+	//Seleccionamos clock del timer 0 con el mismo que cclk
+	LPC_SC->PCCLKSEL0 |= 1<<2;
+
+	//Configuramos TIMER0
+	TIM_TIMERCFG_TYPE timcfg;
+	timcfg.PrescaleOption = TIM_PRESCALE_TICKVAL;
+	timcfg.PrescaleValue = 99; //Configuramos para que TC aumente cada 1us
+	TIM_Init(LPC_TIM0,TIM_TIMER_MODE,&timcfg);
+
+	//Configuramos match 0
+	TIM_MACTCHCFG_TYPE matchcfg;
+	matchcfg.MatchChannel = 0;
+	matchcfg.IntOnMatch = DISABLE;
+	matchcfg.StopOnMatch = DISABLE;
+	matchcfg.ResetOnMatch = ENABLE;
+	matchcfg.ExtMatchOutType = TIM_EXTMATCH_TOGGLE;
+	matchcfg.MatchValue = matches[0];
+	TIM_ConfigMatch(LPC_TIM0,&matchcfg);
+
+	//iniciamos timer0
+	TIM_Cmd(LPC_TIM0, ENABLE);
+}
+
+void configTimer1(){
+	//Configuramos P1.26 como CAP0.0
+	PINSEL_CFG_TYPE pincfg;
+	pincfg.Portnum = 1;
+	pincfg.Pinnum = 26;
+	pincfg.Funcnum = 3;
+	pincfg.Pinmode = PINSEL_MODE_PULLUP;
+	pincfg.OpenDrain = PINSEL_PINMODE_NORMAL;
+	PINSEL_ConfigPin(&pincfg);
+
+	//Alimentamos timer 1
+	LPC_SC->PCONP |= 1<<2;
+
+	//Seleccionamos clock del timer 1 con el mismo que cclk
+	LPC_SC->PCCLKSEL0 |= 1<<4;
+
+	//Configuramos TIMER1
+	TIM_TIMERCFG_TYPE timcfg;
+	timcfg.PrescaleOption = TIM_PRESCALE_TICKVAL;
+	timcfg.PrescaleValue = 99; //Configuramos para que TC aumente cada 1us
+	TIM_Init(LPC_TIM1,TIM_TIMER_MODE,&timcfg);
+
+	//Configuramos match 0
+	TIM_CAPTURECFG_TYPE capcfg;
+	capcfg.CaptureChannel = 0;
+	capcfg.RisingEdge = ENABLE;
+	capcfg.FallingEdge = DISABLE;
+	capcfg.IntOnCaption = ENABLE;
+	TIM_ConfigCapture(LPC_TIM1,&capcfg);
+
+	//iniciamos timer0
+	TIM_Cmd(LPC_TIM1, ENABLE);
+
+	//habilitamos interrupciones
+	NVIC_EnableIRQ(TIMER1_IRQn);
+}
+
+void configLED(){
+
+}
+
+void configEINT(){
+	//P2.10 as EINT0
+	PINSEL_CFG_Type pinCfg;
+	pinCfg.Portnum = PINSEL_PORT_2;
+	pinCfg.Pinnum = PINSEL_PIN_10;
+	pinCfg.Funcnum = PINSEL_FUNC_1;
+	pinCfg.Pinmode = PINSEL_PINMODE_PULLUP;
+	PINSEL_ConfigPin(&pinCfg);
+
+	//Configramos Interrupcion de EINT0
+	EXTI_InitTypeDef eintcfg;
+	eintcfg.EXTI_Line = 0;
+	eintcfg.EXTI_Mode = EXTI_MODE_EDGE_SENSITIVE;
+	eintcfg.EXTI_polarity = 0;
+	EXTI_Config(&eintcfg);
+
+	//Habilitamos interrupcion
+	NVIC_EnableIRQ(EINT0_IRQn);
+}
+
+void EINT0_IRQHandler(){
+	EXTI_ClearEXTIFlag(EXTI_EINT0);
+
+	estado++;
+	if (estado>4){
+		estado=0;
+	}
+
+	//Actualizamos match 0 segun nuevo periodo
+	TIM_UpdateMatchValue(LPC_TIM1, 0, matches[estado]);
+}
+
+void TIMER1_IRQHandler(){
+	TIM_ClearIntPending(LPC_TIM1, TIM_CR0_INT);
+
+	anterior=actual;
+	actual=TIM_GetCaptureValue(LPC_TIM1, TIM_COUNTER_INCAP0);
+
+	if (anterior<actual){
+		periodo = actual-anterior;
+	}else{
+		periodo = 0xFFFFFFFF + actual-anterior;
+	}
+
+	if(periodo<matches[0]){
+		//prender primer LED
+	}
+	if(periodo<matches[1]){
+			//prender 2  LED
+		}
+	if(periodo<matches[2]){
+			//prender 3 LED
+		}
+	if(periodo<matches[3]){
+			//prender 4 LED
+		}
+	if(periodo<matches[4]){
+			//prender 5 LED
+		}
+}

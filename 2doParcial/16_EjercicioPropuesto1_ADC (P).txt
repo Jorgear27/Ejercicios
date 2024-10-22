@@ -1,0 +1,8 @@
+/*
+1- Dada una señal de 100khz de componente espectral máxima que ingresa por
+un pin del ADC, se necesita procesar. El rango dinámico de amplitud es de 3.3v.
+Proponer otra señal de frecuencia definida para que samplee a la señal
+conectada al ADC y poder reconstruirla. 300 samples.
+Escriba el programa de la manera más conveniente. Definir si burst o software,
+tiempos de sampleo, tipo de variables.
+/*
